@@ -175,10 +175,13 @@ price_file = st.sidebar.file_uploader("节点电价统计表.xlsx", type=["xlsx"
 
 if supply_file and price_file:
     with st.spinner("加载数据中..."):
-        # 读供需数据
+        # 读供需数据（宽表转长表）
         supply_raw = pd.read_excel(supply_file, sheet_name="供需汇总")
-        supply_long = supply_raw.melt(id_vars=["分类","名称"], var_name="date", value_name="value")
-        supply_long["date"] = pd.to_datetime(supply_long["date"]).dt.date
+        # 第一列是分类，第二列是名称，后面都是日期列
+        date_cols = [c for c in supply_raw.columns if c not in ["分类", "名称"]]
+        supply_long = supply_raw.melt(id_vars=["分类","名称"], value_vars=date_cols, var_name="date", value_name="value")
+        supply_long["date"] = pd.to_datetime(supply_long["date"], errors="coerce").dt.date
+        supply_long = supply_long.dropna(subset=["date"])
         supply_long = supply_long.rename(columns={"分类":"category", "名称":"name"})
         supply_long = supply_long.pivot_table(index=["date","category"], columns="name", values="value", aggfunc="first").reset_index()
         supply_long["供需比"] = supply_long["新能源发电预测"] / supply_long["系统负荷-联络线(发电)"]
